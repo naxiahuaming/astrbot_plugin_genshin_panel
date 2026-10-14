@@ -16,7 +16,14 @@ from typing import Any, Dict, List, Optional, Tuple
 import aiohttp
 
 from astrbot.api.event import AstrMessageEvent, filter
-from astrbot.api.star import Star, register
+
+try:
+    # StarTools 自 AstrBot v3.5.10 起由 astrbot.api.star 导出
+    from astrbot.api.star import Star, StarTools, register
+except ImportError:  # pragma: no cover - 兼容更早版本的 AstrBot
+    from astrbot.api.star import Star, register  # type: ignore[no-redef]
+
+    StarTools = None  # type: ignore[assignment]
 
 # ---------------------------------------------------------------------------
 # 接口地址
@@ -35,6 +42,12 @@ DATA_BASE_LIST = [
 ]
 
 STATIC_FILES = ("avatars.json", "locs.json", "relics.json", "weapons.json")
+
+# 插件名：用于确定数据目录 data/plugin_data/<PLUGIN_NAME>
+PLUGIN_NAME = "genshin_panel"
+
+# 插件版本
+PLUGIN_VERSION = "1.3.2"
 
 # ---------------------------------------------------------------------------
 # 字段映射
@@ -158,10 +171,10 @@ ALIAS_MAP: Dict[str, List[str]] = {
 
 
 @register(
-    "genshin_panel",
+    PLUGIN_NAME,
     "astrbot-contrib",
     "原神角色面板查询（Enka 数据源）",
-    "1.3.1",
+    PLUGIN_VERSION,
 )
 class GenshinPanelPlugin(Star):
     """原神角色面板查询插件
@@ -186,9 +199,49 @@ class GenshinPanelPlugin(Star):
         self.relic_sets: Dict[str, Any] = {}
         self.weapons: Dict[str, Any] = {}
 
-        self.cache_dir = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "cache"
-        )
+        # 持久化数据目录：data/plugin_data/genshin_panel
+        self.cache_dir = self._resolve_data_dir()
+
+    # ------------------------------ 数据目录 ------------------------------
+
+    @staticmethod
+    def _resolve_data_dir() -> str:
+        """返回插件数据目录 data/plugin_data/genshin_panel 的绝对路径。
+
+        优先调用框架官方接口 StarTools.get_data_dir()，由框架保证落点符合
+        「持久化数据必须保存到 data/plugin_data/<plugin_name>」的规范；
+        若当前 AstrBot 版本未提供该接口，则按标准目录结构推导出同一目录，
+        保证新旧版本行为一致。返回值只指向 data/plugin_data 下，
+        不会写入插件自身目录。
+        """
+        # 1) 框架官方接口（AstrBot v3.5.26 起提供）
+        if StarTools is not None and hasattr(StarTools, "get_data_dir"):
+            try:
+                path = str(StarTools.get_data_dir(PLUGIN_NAME))
+                os.makedirs(path, exist_ok=True)
+                return path
+            except Exception:
+                pass
+
+        # 2) 回退：按 data/plugins/<插件>/main.py 的标准结构推导
+        #    data/plugin_data/<插件>
+        plugin_dir = os.path.dirname(os.path.abspath(__file__))
+        plugins_dir = os.path.dirname(plugin_dir)   # .../data/plugins
+        data_root = os.path.dirname(plugins_dir)    # .../data
+        if (
+            os.path.basename(plugins_dir) == "plugins"
+            and os.path.basename(data_root) == "data"
+        ):
+            path = os.path.join(data_root, "plugin_data", PLUGIN_NAME)
+        else:
+            # 3) 非常规布局：退到插件目录上一级的 plugin_data 下，仍不写回插件目录
+            path = os.path.join(plugins_dir, "plugin_data", PLUGIN_NAME)
+
+        try:
+            os.makedirs(path, exist_ok=True)
+        except Exception:
+            pass
+        return path
 
     # ------------------------------ 基础工具 ------------------------------
 
@@ -197,7 +250,7 @@ class GenshinPanelPlugin(Star):
             timeout = aiohttp.ClientTimeout(total=30)
             self._session = aiohttp.ClientSession(
                 timeout=timeout,
-                headers={"User-Agent": "AstrBot-GenshinPanel/1.3.1"},
+                headers={"User-Agent": f"AstrBot-GenshinPanel/{PLUGIN_VERSION}"},
             )
         return self._session
 
