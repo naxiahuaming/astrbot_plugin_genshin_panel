@@ -2,7 +2,7 @@ name: genshin_panel
 display_name: 原神角色面板查询
 desc: 按 UID + 角色名查询原神角色的面板属性、武器与圣遗物详情（Enka 数据源）
 author: naxiahuaming
-version: 1.3.2
+version: 1.3.3
 repo: https://github.com/naxiahuaming/astrbot_plugin_genshin_panel
 category: 娱乐
 tags:
