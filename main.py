@@ -47,7 +47,7 @@ STATIC_FILES = ("avatars.json", "locs.json", "relics.json", "weapons.json")
 PLUGIN_NAME = "genshin_panel"
 
 # 插件版本
-PLUGIN_VERSION = "1.3.2"
+PLUGIN_VERSION = "1.3.3"
 
 # ---------------------------------------------------------------------------
 # 字段映射
